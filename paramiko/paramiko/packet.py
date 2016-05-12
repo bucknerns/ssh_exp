@@ -61,7 +61,7 @@ class Packetizer (object):
         self.__socket = socket
         self.__logger = None
         self.__closed = False
-        self.__dump_packets = False
+        self.__dump_packets = True
         self.__need_rekey = False
         self.__init_count = 0
         self.__remainder = bytes()

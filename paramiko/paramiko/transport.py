@@ -67,7 +67,7 @@ from paramiko.ssh_exception import (SSHException, BadAuthenticationType,
                                     ChannelException, ProxyCommandFailure)
 from paramiko.util import retry_on_signal, ClosingContextManager, clamp_value
 
-
+from sshaolin.engine.models.kex_init import KexInitModel
 
 # for thread cleanup
 _active_threads = []
@@ -1904,35 +1904,18 @@ class Transport (threading.Thread, ClosingContextManager):
         finally:
             self.clear_to_send_lock.release()
         self.in_kex = True
-        if self.server_mode:
-            mp_required_prefix = 'diffie-hellman-group-exchange-sha'
-            kex_mp = [k for k in self._preferred_kex if k.startswith(mp_required_prefix)]
-            if (self._modulus_pack is None) and (len(kex_mp) > 0):
-                # can't do group-exchange if we don't have a pack of potential primes
-                pkex = [k for k in self.get_security_options().kex
-                                if not k.startswith(mp_required_prefix)]
-                self.get_security_options().kex = pkex
-            available_server_keys = list(filter(list(self.server_key_dict.keys()).__contains__,
-                                                self._preferred_keys))
-        else:
-            available_server_keys = self._preferred_keys
+        available_server_keys = self._preferred_keys
+        m = KexInitModel(
+            kex_algorithms=self._preferred_kex,
+            server_host_key_algorithms=available_server_keys,
+            encryption_algorithms_to_server=self._preferred_ciphers,
+            encryption_algorithms_from_server=self._preferred_ciphers,
+            mac_algorithms_to_server=self._preferred_macs,
+            mac_algorithms_from_server=self._preferred_macs,
+            compression_algorithms_to_server=self._preferred_compression,
+            compression_algorithms_from_server=self._preferred_compression,
+            first_kex_packet_follows=False)
 
-        m = Message()
-        m.add_byte(cMSG_KEXINIT)
-        m.add_bytes(os.urandom(16))
-        m.add_list(self._preferred_kex)
-        m.add_list(available_server_keys)
-        m.add_list(self._preferred_ciphers)
-        m.add_list(self._preferred_ciphers)
-        m.add_list(self._preferred_macs)
-        m.add_list(self._preferred_macs)
-        m.add_list(self._preferred_compression)
-        m.add_list(self._preferred_compression)
-        m.add_string(bytes())
-        m.add_string(bytes())
-        m.add_boolean(False)
-        m.add_int(0)
-        # save a copy for later (needed to compute a hash)
         self.local_kex_init = m.asbytes()
         self._send_message(m)
 
