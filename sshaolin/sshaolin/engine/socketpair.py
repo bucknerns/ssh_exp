@@ -80,7 +80,7 @@ class Client(Process):
         self.socket = socket_
 
     def run(self):
-        send_obj(self.socket, {"cmd": "print", "data": "Hello Server"})
+        send_obj(self.socket, {"cmd": "print", "data": "message recieved from client"})
         ret_val = recv_obj(self.socket)
         print(ret_val)
         print("client exited")
@@ -102,7 +102,7 @@ class Server(Process):
                 continue
             elif data.get("cmd") == "print":
                 print(data.get("data"))
-                send_obj(self.socket, "Hello Client!")
+                send_obj(self.socket, "message recieved from server")
                 done_stuff = True
         print "server exited"
 
@@ -113,11 +113,12 @@ def main():
 
     proc1 = Client(client_socket)
     proc2 = Server(server_socket)
+    print proc2.socket
     proc2.start()
     proc1.start()
     proc1.join()
-    print("joined proc1")
-    # send_obj(client_socket, None)
+    print("joined client")
+    send_obj(client_socket, None)
     print("sent None to server")
     proc2.join()
     print("joined proc2")

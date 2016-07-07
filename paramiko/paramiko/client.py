@@ -226,7 +226,8 @@ class SSHClient (ClosingContextManager):
         gss_kex=False,
         gss_deleg_creds=True,
         gss_host=None,
-        banner_timeout=None):
+        banner_timeout=None
+    ):
         """
         Connect to an SSH server and authenticate to it.  The server's host key
         is checked against the system host keys (see `load_system_host_keys`)
@@ -381,6 +382,12 @@ class SSHClient (ClosingContextManager):
     def close(self):
         """
         Close this SSHClient and its underlying `.Transport`.
+
+        .. warning::
+            Failure to do this may, in some situations, cause your Python
+            interpreter to hang at shutdown (often due to race conditions).
+            It's good practice to `close` your client objects anytime you're
+            done using them, instead of relying on garbage collection.
         """
         if self._transport is None:
             return
@@ -420,9 +427,8 @@ class SSHClient (ClosingContextManager):
         stderr = chan.makefile_stderr('r', bufsize)
         return stdin, stdout, stderr
 
-    def invoke_shell(
-        self, term='vt100', width=80, height=24, width_pixels=0,
-            height_pixels=0):
+    def invoke_shell(self, term='vt100', width=80, height=24, width_pixels=0,
+                     height_pixels=0):
         """
         Start an interactive shell session on the SSH server.  A new `.Channel`
         is opened and connected to a pseudo-terminal using the requested
@@ -461,9 +467,8 @@ class SSHClient (ClosingContextManager):
         """
         return self._transport
 
-    def _auth(
-        self, username, password, pkey, key_filenames, allow_agent,
-            look_for_keys, gss_auth, gss_kex, gss_deleg_creds, gss_host):
+    def _auth(self, username, password, pkey, key_filenames, allow_agent,
+              look_for_keys, gss_auth, gss_kex, gss_deleg_creds, gss_host):
         """
         Try, in order:
 

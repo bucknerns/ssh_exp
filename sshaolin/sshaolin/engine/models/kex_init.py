@@ -58,3 +58,22 @@ class KexInitModel(BaseModel):
         msg += self._write_bool(self.first_kex_packet_follows)
         msg += self._write_int(0, 4)
         return msg
+
+    @classmethod
+    def from_bytes(cls, bytes_):
+        model = cls(
+            cookie=cls._get_bytes(16, bytes_),
+            kex_algorithms=cls._get_list(bytes_),
+            server_host_key_algorithms=cls._get_list(bytes_),
+            encryption_algorithms_to_server=cls._get_list(bytes_),
+            encryption_algorithms_from_server=cls._get_list(bytes_),
+            mac_algorithms_to_server=cls._get_list(bytes_),
+            mac_algorithms_from_server=cls._get_list(bytes_),
+            compression_algorithms_to_server=cls._get_list(bytes_),
+            compression_algorithms_from_server=cls._get_list(bytes_),
+            languages_to_server=cls._get_list(bytes_),
+            languages_from_server=cls._get_list(bytes_),
+            first_kex_packet_follows=cls._get_bool(bytes_))
+
+        model._padding = cls._get_int(4, bytes_)
+        return model

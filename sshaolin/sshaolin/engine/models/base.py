@@ -1,6 +1,23 @@
 import six
 
 
+messages = {}
+
+
+class MessageType(type):
+    def __new__(cls, cls_name, cls_parents, cls_attr):
+        new_class = super(MessageType, cls).__new__(
+            cls, cls_name, cls_parents, cls_attr)
+
+        if getattr(new_class, "message_id", False):
+            if new_class.message_id in messages:
+                msg = "Message id {}".format(new_class.message_id)
+                raise Exception(msg)
+            messages[new_class.message_id] = new_class
+        return new_class
+
+
+@six.add_metaclass(MessageType)
 class BaseModel(object):
     def __init__(self, kwargs):
         for k, v in kwargs.items():
@@ -39,8 +56,38 @@ class BaseModel(object):
             return b"\x00"
 
     def asbytes(self):
-        print([self.to_bytes()])
         return self.to_bytes()
+
+    @classmethod
+    def from_message(cls, message, type_=None):
+        type_ = type_ or cls.message_id
+        bytes_ = six.BytesIO(message)
+        model = messages[int(type_)].from_bytes(bytes_)
+        current_pos = bytes_.tell()
+        bytes_.seek(0)
+        model._raw = b"{0}{1}".format(
+            six.int2byte(model.message_id), bytes_.read(current_pos))
+        return model
+
+    @classmethod
+    def _get_list(cls, bytes_):
+        num_bytes = cls._get_int(4, bytes_)
+        return bytes_.read(num_bytes).split(b",")
+
+    @staticmethod
+    def _get_bytes(n, bytes_):
+        return bytes_.read(n)
+
+    @staticmethod
+    def _get_int(n, bytes_):
+        int_bytes = bytes_.read(n)
+        return sum([
+            six.byte2int(int_bytes[i:]) << (8 * x) for i, x in enumerate(
+                range(n - 1, -1, -1))])
+
+    @classmethod
+    def _get_bool(cls, bytes_):
+        return bool(cls._get_int(1, bytes_))
 
 
 class PacketModel(BaseModel):

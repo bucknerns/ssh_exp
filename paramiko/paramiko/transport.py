@@ -58,7 +58,7 @@ from paramiko.kex_gss import KexGSSGex, KexGSSGroup1, KexGSSGroup14, NullHostKey
 from paramiko.message import Message
 from paramiko.packet import Packetizer, NeedRekeyException
 from paramiko.primes import ModulusPack
-from paramiko.py3compat import string_types, long, byte_ord, b, input
+from paramiko.py3compat import string_types, long, byte_ord, b, input, PY2
 from paramiko.rsakey import RSAKey
 from paramiko.ecdsakey import ECDSAKey
 from paramiko.server import ServerInterface
@@ -1533,8 +1533,23 @@ class Transport (threading.Thread, ClosingContextManager):
     def stop_thread(self):
         self.active = False
         self.packetizer.close()
-        while self.is_alive() and (self is not threading.current_thread()):
-            self.join(10)
+        if PY2:
+            # Original join logic; #520 doesn't appear commonly present under
+            # Python 2.
+            while self.is_alive() and self is not threading.current_thread():
+                self.join(10)
+        else:
+            # Keep trying to join() our main thread, quickly, until:
+            # * We join()ed successfully (self.is_alive() == False)
+            # * Or it looks like we've hit issue #520 (socket.recv hitting some
+            # race condition preventing it from timing out correctly), wherein
+            # our socket and packetizer are both closed (but where we'd
+            # otherwise be sitting forever on that recv()).
+            while (
+                self.is_alive() and self is not threading.current_thread()
+                and not self.sock._closed and not self.packetizer.closed
+            ):
+                self.join(0.1)
 
     ###  internals...
 
@@ -1920,116 +1935,84 @@ class Transport (threading.Thread, ClosingContextManager):
         self._send_message(m)
 
     def _parse_kex_init(self, m):
-        cookie = m.get_bytes(16)
-        kex_algo_list = m.get_list()
-        server_key_algo_list = m.get_list()
-        client_encrypt_algo_list = m.get_list()
-        server_encrypt_algo_list = m.get_list()
-        client_mac_algo_list = m.get_list()
-        server_mac_algo_list = m.get_list()
-        client_compress_algo_list = m.get_list()
-        server_compress_algo_list = m.get_list()
-        client_lang_list = m.get_list()
-        server_lang_list = m.get_list()
-        kex_follows = m.get_boolean()
-        unused = m.get_int()
+        def find_common(list1, list2, raise_error=None):
+            for key in list1:
+                if key in list2:
+                    return key
+            if raise_error is not None:
+                raise SSHException(raise_error)
 
-        self._log(DEBUG, 'kex algos:' + str(kex_algo_list) + ' server key:' + str(server_key_algo_list) +
-                  ' client encrypt:' + str(client_encrypt_algo_list) +
-                  ' server encrypt:' + str(server_encrypt_algo_list) +
-                  ' client mac:' + str(client_mac_algo_list) +
-                  ' server mac:' + str(server_mac_algo_list) +
-                  ' client compress:' + str(client_compress_algo_list) +
-                  ' server compress:' + str(server_compress_algo_list) +
-                  ' client lang:' + str(client_lang_list) +
-                  ' server lang:' + str(server_lang_list) +
-                  ' kex follows?' + str(kex_follows))
+        m = KexInitModel.from_message(m.packet.read())
+        self._log(DEBUG, (
+            "kex algos: {0}\n"
+            "server key: {1}\n"
+            "client encrypt: {2}\n"
+            "server encrypt: {3}\n"
+            "client mac: {4}\n"
+            "server mac: {5}\n"
+            "client compress: {6}\n"
+            "server compress: {7}\n"
+            "client lang: {8}\n"
+            "server lang: {9}\n"
+            "kex follows: {10}\n").format(
+                m.kex_algorithms,
+                m.server_host_key_algorithms,
+                m.encryption_algorithms_to_server,
+                m.encryption_algorithms_from_server,
+                m.mac_algorithms_to_server,
+                m.mac_algorithms_from_server,
+                m.compression_algorithms_to_server,
+                m.compression_algorithms_from_server,
+                m.languages_to_server,
+                m.languages_from_server,
+                m.first_kex_packet_follows))
 
-        # as a server, we pick the first item in the client's list that we
-        # support.
-        # as a client, we pick the first item in our list that the server
-        # supports.
-        if self.server_mode:
-            agreed_kex = list(filter(
-                self._preferred_kex.__contains__,
-                kex_algo_list
-            ))
-        else:
-            agreed_kex = list(filter(
-                kex_algo_list.__contains__,
-                self._preferred_kex
-            ))
-        if len(agreed_kex) == 0:
-            raise SSHException('Incompatible ssh peer (no acceptable kex algorithm)')
-        self.kex_engine = self._kex_info[agreed_kex[0]](self)
-        self._log(DEBUG, "Kex agreed: %s" % agreed_kex[0])
+        agreed_kex = find_common(
+            self._preferred_kex, m.kex_algorithms,
+            "Incompatible ssh peer (no acceptable kex algorithm)")
+        print(self._preferred_kex, "\n", m.kex_algorithms)
+        self.kex_engine = self._kex_info[agreed_kex](self)
+        self._log(DEBUG, "Kex agreed: %s" % agreed_kex)
 
-        if self.server_mode:
-            available_server_keys = list(filter(list(self.server_key_dict.keys()).__contains__,
-                                                self._preferred_keys))
-            agreed_keys = list(filter(available_server_keys.__contains__, server_key_algo_list))
-        else:
-            agreed_keys = list(filter(server_key_algo_list.__contains__, self._preferred_keys))
-        if len(agreed_keys) == 0:
-            raise SSHException('Incompatible ssh peer (no acceptable host key)')
-        self.host_key_type = agreed_keys[0]
-        if self.server_mode and (self.get_server_key() is None):
-            raise SSHException('Incompatible ssh peer (can\'t match requested host key type)')
+        self.host_key_type = find_common(
+            self._preferred_keys, m.server_host_key_algorithms,
+            "Incompatible ssh peer (no acceptable host key)")
 
-        if self.server_mode:
-            agreed_local_ciphers = list(filter(self._preferred_ciphers.__contains__,
-                                           server_encrypt_algo_list))
-            agreed_remote_ciphers = list(filter(self._preferred_ciphers.__contains__,
-                                          client_encrypt_algo_list))
-        else:
-            agreed_local_ciphers = list(filter(client_encrypt_algo_list.__contains__,
-                                          self._preferred_ciphers))
-            agreed_remote_ciphers = list(filter(server_encrypt_algo_list.__contains__,
-                                           self._preferred_ciphers))
-        if (len(agreed_local_ciphers) == 0) or (len(agreed_remote_ciphers) == 0):
-            raise SSHException('Incompatible ssh server (no acceptable ciphers)')
-        self.local_cipher = agreed_local_ciphers[0]
-        self.remote_cipher = agreed_remote_ciphers[0]
+        self.local_cipher = find_common(
+            self._preferred_ciphers, m.encryption_algorithms_to_server,
+            "Incompatible ssh server (no acceptable ciphers)")
+        self.remote_cipher = find_common(
+            self._preferred_ciphers, m.encryption_algorithms_from_server,
+            "Incompatible ssh server (no acceptable ciphers)")
         self._log_agreement(
-            'Cipher', local=self.local_cipher, remote=self.remote_cipher
-        )
+            "Cipher", local=self.local_cipher, remote=self.remote_cipher)
 
-        if self.server_mode:
-            agreed_remote_macs = list(filter(self._preferred_macs.__contains__, client_mac_algo_list))
-            agreed_local_macs = list(filter(self._preferred_macs.__contains__, server_mac_algo_list))
-        else:
-            agreed_local_macs = list(filter(client_mac_algo_list.__contains__, self._preferred_macs))
-            agreed_remote_macs = list(filter(server_mac_algo_list.__contains__, self._preferred_macs))
-        if (len(agreed_local_macs) == 0) or (len(agreed_remote_macs) == 0):
-            raise SSHException('Incompatible ssh server (no acceptable macs)')
-        self.local_mac = agreed_local_macs[0]
-        self.remote_mac = agreed_remote_macs[0]
+        self.local_mac = find_common(
+            self._preferred_macs, m.mac_algorithms_to_server,
+            "Incompatible ssh server (no acceptable macs)")
+        self.remote_mac = find_common(
+            self._preferred_macs, m.mac_algorithms_from_server,
+            "Incompatible ssh server (no acceptable macs)")
         self._log_agreement(
-            'MAC', local=self.local_mac, remote=self.remote_mac
-        )
+            "MAC", local=self.local_mac, remote=self.remote_mac)
 
-        if self.server_mode:
-            agreed_remote_compression = list(filter(self._preferred_compression.__contains__, client_compress_algo_list))
-            agreed_local_compression = list(filter(self._preferred_compression.__contains__, server_compress_algo_list))
-        else:
-            agreed_local_compression = list(filter(client_compress_algo_list.__contains__, self._preferred_compression))
-            agreed_remote_compression = list(filter(server_compress_algo_list.__contains__, self._preferred_compression))
-        if (len(agreed_local_compression) == 0) or (len(agreed_remote_compression) == 0):
-            raise SSHException('Incompatible ssh server (no acceptable compression) %r %r %r' % (agreed_local_compression, agreed_remote_compression, self._preferred_compression))
-        self.local_compression = agreed_local_compression[0]
-        self.remote_compression = agreed_remote_compression[0]
+        self.local_compression = find_common(
+            self._preferred_compression, m.compression_algorithms_to_server,
+            "Incompatible ssh server (no acceptable compression)")
+        self.remote_compression = find_common(
+            self._preferred_compression, m.compression_algorithms_from_server,
+            "Incompatible ssh server (no acceptable compression)")
         self._log_agreement(
-            'Compression',
-            local=self.local_compression,
-            remote=self.remote_compression
-        )
+            "Compression", local=self.local_compression,
+            remote=self.remote_compression)
 
         # save for computing hash later...
         # now wait!  openssh has a bug (and others might too) where there are
         # actually some extra bytes (one NUL byte in openssh's case) added to
         # the end of the packet but not parsed.  turns out we need to throw
         # away those bytes because they aren't part of the hash.
-        self.remote_kex_init = cMSG_KEXINIT + m.get_so_far()
+        self.remote_kex_init = m._raw
+        del m
 
     def _activate_inbound(self):
         """switch on newly negotiated encryption parameters for inbound traffic"""
