@@ -354,7 +354,15 @@ class Packetizer (object):
                 data = self.__compress_engine_out(data)
             packet = self._build_packet(data)
             if self.__dump_packets:
-                self._log(DEBUG, 'Write packet <%s>, length %d' % (cmd_name, orig_len))
+                dump_out = (
+                    "{0}\n".format("=" * 50) +
+                    "Sent Packet: \n" +
+                    "    Command Name: {0}\n".format(cmd_name) +
+                    "    Command Number: {0}\n".format(cmd) +
+                    "    Command Hex: {0}\n".format(hex(cmd)) +
+                    "    Command Length: {0}\n".format(orig_len) +
+                    "{0}\n".format("-" * 50))
+                self._log(DEBUG, dump_out)
                 self._log(DEBUG, util.format_binary(packet, 'OUT: '))
             if self.__block_engine_out is not None:
                 out = self.__block_engine_out.update(packet)
@@ -454,7 +462,15 @@ class Packetizer (object):
         else:
             cmd_name = '$%x' % cmd
         if self.__dump_packets:
-            self._log(DEBUG, 'Read packet <%s>, length %d' % (cmd_name, len(payload)))
+            dump_out = (
+                "{0}\n".format("=" * 50) +
+                "Read Packet: \n" +
+                "    Command Name: {0}\n".format(cmd_name) +
+                "    Command Number: {0}\n".format(cmd) +
+                "    Command Hex: {0}\n".format(hex(cmd)) +
+                "    Command Length: {0}\n".format(len(payload)) +
+                "{0}\n".format("-" * 50))
+            self._log(DEBUG, dump_out)
         return cmd, msg
 
     ##########  protected

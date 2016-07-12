@@ -9,10 +9,18 @@ class MessageIDs(object):
     SSH_MSG_SERVICE_ACCEPT = 6              # [SSH-TRANS]
     SSH_MSG_KEXINIT = 20                    # [SSH-TRANS]
     SSH_MSG_NEWKEYS = 21                    # [SSH-TRANS]
+
+    SSH_MSG_KEXRSA_PUBKEY = 30
+    SSH_MSG_KEXRSA_SECRET = 31
+    SSH_MSG_KEXRSA_DONE = 32
+
     SSH_MSG_USERAUTH_REQUEST = 50           # [SSH-USERAUTH]
     SSH_MSG_USERAUTH_FAILURE = 51           # [SSH-USERAUTH]
     SSH_MSG_USERAUTH_SUCCESS = 52           # [SSH-USERAUTH]
     SSH_MSG_USERAUTH_BANNER = 53            # [SSH-USERAUTH]
+    SSH_MSG_USERAUTH_INFO_REQUEST = 60      # [SSH-USERAUTH]
+    SSH_MSG_USERAUTH_INFO_RESPONSE = 61     # [SSH-USERAUTH]
+
     SSH_MSG_GLOBAL_REQUEST = 80             # [SSH-CONNECT]
     SSH_MSG_REQUEST_SUCCESS = 81            # [SSH-CONNECT]
     SSH_MSG_REQUEST_FAILURE = 82            # [SSH-CONNECT]
@@ -144,17 +152,17 @@ class GlobalRequestNames(object):
 
 
 class ChannelRequestNames(object):
-    PTY_REQ = b"pty-req"             # [SSH-CONNECT, Section 6.2]
-    X11_REQ = b"x11-req"             # [SSH-CONNECT, Section 6.3.1]
-    ENV = b"env"                     # [SSH-CONNECT, Section 6.4]
-    SHELL = b"shell"                 # [SSH-CONNECT, Section 6.5]
-    EXEC = b"exec"                   # [SSH-CONNECT, Section 6.5]
-    SUBSYSTEM = b"subsystem"         # [SSH-CONNECT, Section 6.5]
+    PTY_REQ = b"pty-req"              # [SSH-CONNECT, Section 6.2]
+    X11_REQ = b"x11-req"              # [SSH-CONNECT, Section 6.3.1]
+    ENV = b"env"                      # [SSH-CONNECT, Section 6.4]
+    SHELL = b"shell"                  # [SSH-CONNECT, Section 6.5]
+    EXEC = b"exec"                    # [SSH-CONNECT, Section 6.5]
+    SUBSYSTEM = b"subsystem"          # [SSH-CONNECT, Section 6.5]
     WINDOW_CHANGE = b"window-change"  # [SSH-CONNECT, Section 6.7]
-    XON_XOFF = b"xon-xoff"           # [SSH-CONNECT, Section 6.8]
-    SIGNAL = b"signal"               # [SSH-CONNECT, Section 6.9]
-    EXIT_STATUS = b"exit-status"     # [SSH-CONNECT, Section 6.10]
-    EXIT_SIGNAL = b"exit-signal"     # [SSH-CONNECT, Section 6.10]
+    XON_XOFF = b"xon-xoff"            # [SSH-CONNECT, Section 6.8]
+    SIGNAL = b"signal"                # [SSH-CONNECT, Section 6.9]
+    EXIT_STATUS = b"exit-status"      # [SSH-CONNECT, Section 6.10]
+    EXIT_SIGNAL = b"exit-signal"      # [SSH-CONNECT, Section 6.10]
 
 
 class SignalNames(object):

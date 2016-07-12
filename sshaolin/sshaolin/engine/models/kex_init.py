@@ -77,3 +77,13 @@ class KexInitModel(BaseModel):
 
         model._padding = cls._get_int(4, bytes_)
         return model
+
+
+class Kex30(BaseModel):
+    """
+    byte      SSH_MSG_KEXRSA_PUBKEY
+    string    server public host key and certificates (K_S)
+    string    K_T, transient RSA public key
+    """
+    message_id = MessageIDs.SSH_MSG_KEXINIT
+    def __init__(self,
