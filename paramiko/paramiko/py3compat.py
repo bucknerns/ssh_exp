@@ -1,4 +1,4 @@
-import sys
+import struct
 import base64
 
 import six
@@ -14,7 +14,6 @@ integer_types = six.integer_types
 builtins = six.moves.builtins
 PY2 = six.PY2
 byte_chr = six.int2byte
-b = six.b
 u = six.u
 is_callable = six.callable
 next = six.next
@@ -25,6 +24,19 @@ BytesIO = StringIO if PY2 else six.BytesIO
 
 input = six.moves.input
 MAXSIZE = six.MAXSIZE
+
+
+def b(string):
+    if isinstance(string, six.binary_type):
+        return string
+    elif isinstance(string, six.string_types):
+        if PY2:
+            return bytes(string)
+        else:
+            return bytes(string, "utf-8")
+    else:
+        raise Exception("Not bytes or string")
+
 
 def byte_ord(c):
     if not isinstance(c, integer_types):

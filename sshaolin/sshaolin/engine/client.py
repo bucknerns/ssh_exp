@@ -1,7 +1,7 @@
 import six
 import socket
 import errno
-
+from sshaolin.engine import socket_helper
 
 def handle_eintr(func):
     """Temporary fix until pep 475 is implemented"""
@@ -27,8 +27,14 @@ def class_eintr(cls):
 @class_eintr
 class SSHMessageClient(object):
     def __init__(self, host, port):
+        super(SSHMessageClient, self).__init__()
         self.host = host
         self.port = port
+
+        self.listensock = create_listen_socket()
+        self.port = self.listensock.getsockname()[1]
+        self.sockets = [self.listensock]
+
 
     def _connect(self, sock=None):
         self._sock = sock or handle_eintr(socket.create_connection)(

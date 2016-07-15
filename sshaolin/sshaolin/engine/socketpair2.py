@@ -2,18 +2,14 @@ from threading import Thread
 import six
 import socket
 from select import select
-import cPickle as pickle
-
-LOCALHOST = "127.0.0.1"
-TYPE = socket.SOCK_STREAM
-PROTO = socket.IPPROTO_IP
-FAMILY = socket.AF_INET
+from six.moves import cPickle as pickle
 
 
 def create_listen_socket():
-    listensock = socket.socket(FAMILY, TYPE, PROTO)
+    listensock = socket.socket(
+        socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
     listensock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listensock.bind((LOCALHOST, 0))
+    listensock.bind(("127.0.0.1", 0))
     listensock.listen(128)
     listensock.setblocking(False)
     return listensock
@@ -21,8 +17,9 @@ def create_listen_socket():
 
 def connect_socket(port):
     try:
-        csock = socket.socket(FAMILY, TYPE, PROTO)
-        csock.connect((LOCALHOST, port))
+        csock = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+        csock.connect(("127.0.0.1", port))
     except:
         csock.close()
         raise
@@ -88,7 +85,7 @@ class Server(Thread):
                     continue
                 data = recv_obj(s)
                 if data is None:
-                    print "server exited"
+                    print("server exited")
                     exit(0)
                 elif data.get("cmd") == "print":
                     print(data.get("data"))
@@ -98,7 +95,7 @@ class Server(Thread):
 def main():
     server = Server()
     server.start()
-    print server.port
+    print(server.port)
     proc1 = Client(server.port)
     proc1.start()
     proc1.join()

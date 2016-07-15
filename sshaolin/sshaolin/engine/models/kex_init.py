@@ -1,5 +1,4 @@
 import os
-import six
 
 from sshaolin.engine.constants import MessageIDs
 from sshaolin.engine.models.base import BaseModel
@@ -39,7 +38,7 @@ class KexInitModel(BaseModel):
         languages_from_server=None,
             first_kex_packet_follows=None):
         super(KexInitModel, self).__init__(locals())
-        self.cookie = six.b(cookie) if cookie is not None else os.urandom(16)
+        self.cookie = bytes(cookie if cookie is not None else os.urandom(16))
 
     def to_bytes(self):
         msg = b""
@@ -78,7 +77,7 @@ class KexInitModel(BaseModel):
         model._padding = cls._get_int(4, bytes_)
         return model
 
-
+'''
 class Kex30(BaseModel):
     """
     byte      SSH_MSG_KEXRSA_PUBKEY
@@ -86,4 +85,4 @@ class Kex30(BaseModel):
     string    K_T, transient RSA public key
     """
     message_id = MessageIDs.SSH_MSG_KEXINIT
-    def __init__(self,
+    def __init__(self,'''

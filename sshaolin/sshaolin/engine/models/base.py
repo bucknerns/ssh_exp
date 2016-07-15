@@ -38,14 +38,15 @@ class BaseModel(object):
         tmp = b""
         if list_:
             for string in list_[:-1]:
-                tmp += six.b(string)
+                print(string)
+                tmp += bytes(string)
                 tmp += b","
-            tmp += six.b(list_[-1])
+            tmp += bytes(list_[-1])
         return cls._write_string(tmp)
 
     @classmethod
     def _write_string(cls, string):
-        string = six.b(string or b"")
+        string = string or b""
         return cls._write_int(len(string), 4) + string
 
     @staticmethod
@@ -65,8 +66,7 @@ class BaseModel(object):
         model = messages[int(type_)].from_bytes(bytes_)
         current_pos = bytes_.tell()
         bytes_.seek(0)
-        model._raw = b"{0}{1}".format(
-            six.int2byte(model.message_id), bytes_.read(current_pos))
+        model._raw = six.int2byte(model.message_id) + bytes_.read(current_pos)
         return model
 
     @classmethod
